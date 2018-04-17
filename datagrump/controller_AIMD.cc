@@ -4,8 +4,8 @@
 #include "controller.hh"
 #include "timestamp.hh"
 
-#define MULT_DEC 0.25
-#define RTT_DELAY_TRIGGER 150
+#define MULT_DEC 0.5
+#define RTT_DELAY_TRIGGER 60
 
 using namespace std;
 
@@ -46,6 +46,17 @@ void Controller::datagram_was_sent( const uint64_t sequence_number,
 	 << " sent datagram " << sequence_number << " (timeout = " << after_timeout << ")\n";
   }
 
+ //If congestion was detected, multiplicatively decrease, making
+  //sure not to go below 1.
+ 
+  
+  if(after_timeout){
+    cwd_d = floor(cwd_d) * MULT_DEC;
+    if(cwd_d < 1){
+      cwd_d = 1;
+    }
+  }
+
 }
 
 /* An ack was received */
@@ -73,21 +84,12 @@ void Controller::ack_received( const uint64_t sequence_number_acked,
   
   //For AIMD
 
-  //If there was no congestion, as determiend by RTT, then increase
-  //window as in TCP. 
-  if(rtt < RTT_DELAY_TRIGGER){
+  //If received an ACK packet that doesn't signify congestion
+  //(rtt less than timeout), then increase the window size as in TCP 
+  if(rtt < RTT_DELAY_TRIGGER)
     cwd_d += 1/floor(cwd_d);
-   
   
-  }
-  //If congestion was detected, multiplicatively decrease, making
-  //sure not to go below 1.
-  else{
-    cwd_d = floor(cwd_d) * MULT_DEC;
-    if(cwd_d < 1){
-      cwd_d = 1;
-    }
-  }
+ 
 
 }
 
@@ -95,5 +97,5 @@ void Controller::ack_received( const uint64_t sequence_number_acked,
    before sending one more datagram */
 unsigned int Controller::timeout_ms()
 {
-  return 150;
+  return RTT_DELAY_TRIGGER;
 }
